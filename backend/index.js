@@ -1,0 +1,86 @@
+import dotenv from 'dotenv';
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import passport from 'passport';
+
+dotenv.config();
+
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('Error: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not defined in .env file');
+    process.exit(1);
+}
+
+if (!process.env.MONGO_URI) {
+    console.error('Error: MONGO_URI is not defined in .env file');
+    process.exit(1);
+}
+
+if (!process.env.SESSION_SECRET) {
+    console.error('Error: SESSION_SECRET is not defined in .env file');
+    process.exit(1);
+}
+
+import UserRoutes from './Routes/UserRoutes.js';
+import DoctorRoutes from './Routes/DoctorRoutes.js';
+import DocumentRoutes from './Routes/DocumentRoutes.js';
+import GoogleAuthRoutes from './Routes/GoogleAuthRoutes.js';
+import SmartWatchRoutes from './Routes/SmartWatchRoutes.js';
+import { initializeGoogleStrategy } from './Controllers/GoogleAuthController.js';
+
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log('MongoDB connected successfully.');
+    })
+    .catch((err) => {
+        console.error('MongoDB connection failed:', err.message);
+        process.exit(1);
+    });
+
+app.use(express.json());
+app.use(cookieParser());
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+}));
+
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: process.env.NODE_ENV === 'production'
+    }
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+initializeGoogleStrategy();
+
+app.use('/api/users', UserRoutes);
+app.use('/api/doctors', DoctorRoutes);
+app.use('/api/documents', DocumentRoutes);
+app.use('/api/auth/google', GoogleAuthRoutes);
+app.use('/api/smartwatch', SmartWatchRoutes); 
+
+
+app.get('/', (req, res) => {
+    res.send('AyurSutra API is running!');
+});
+
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
