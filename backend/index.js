@@ -49,7 +49,10 @@ import { initializeGoogleStrategy } from './Controllers/GoogleAuthController.js'
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-mongoose.connect(MONGO_URI)
+// Always use the PanchVeda database unless explicitly overridden
+const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'PanchVeda';
+
+mongoose.connect(MONGO_URI, { dbName: MONGO_DB_NAME })
     .then(async () => {
         console.log('✅ MongoDB connected successfully.');
         console.log('📊 Database:', mongoose.connection.name || 'default');

@@ -11,12 +11,15 @@ export const initializeGoogleStrategy = () => {
     }
 
     const PORT = process.env.PORT || 5000;
-    const patientCallbackURL = process.env.GOOGLE_REDIRECT_URI_ || `http://localhost:${PORT}/api/auth/google/patient/callback`;
+    // Use clear, explicit env vars. Fallbacks match GCP console entries provided by the user
+    const patientCallbackURL = process.env.GOOGLE_PATIENT_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI || `http://localhost:${PORT}/api/auth/google/patient/callback`;
     const doctorCallbackURL = process.env.GOOGLE_DOCTOR_REDIRECT_URI || `http://localhost:${PORT}/api/auth/google/doctor/callback`;
     
+    const maskedClientId = (process.env.GOOGLE_CLIENT_ID || '').replace(/.(?=.{6})/g, '*');
     console.log('Initializing Google OAuth with callbacks:', {
         patient: patientCallbackURL,
-        doctor: doctorCallbackURL
+        doctor: doctorCallbackURL,
+        clientId_tail: process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.slice(-8) : 'missing'
     });
 
     const buildStrategy = (role, callbackURL) => new GoogleStrategy({
