@@ -29,6 +29,20 @@ import DoctorRoutes from './Routes/DoctorRoutes.js';
 import DocumentRoutes from './Routes/DocumentRoutes.js';
 import GoogleAuthRoutes from './Routes/GoogleAuthRoutes.js';
 import SmartWatchRoutes from './Routes/SmartWatchRoutes.js';
+import TreatmentPlanRoutes from './Routes/TreatmentPlanRoutes.js';
+import AIRoutes from './Routes/AIRoutes.js';
+import ReminderRoutes from './Routes/ReminderRoutes.js';
+import NewsRoutes from './Routes/NewsRoutes.js';
+import ChatbotRoutes from './Routes/ChatbotRoutes.js';
+import AppointmentRoutes from './Routes/AppointmentRoutes.js';
+import PatientRecordRoutes from './Routes/PatientRecordRoutes.js';
+import GuidelinesRoutes from './Routes/GuidelinesRoutes.js';
+import ConsentRoutes from './Routes/ConsentRoutes.js';
+import PrepRoutes from './Routes/PrepRoutes.js';
+import FeedbackRoutes from './Routes/FeedbackRoutes.js';
+import SettingsRoutes from './Routes/SettingsRoutes.js';
+import MedicationRoutes from './Routes/MedicationRoutes.js';
+import DoctorDashboardRoutes from './Routes/DoctorDashboardRoutes.js';
 import { initializeGoogleStrategy } from './Controllers/GoogleAuthController.js';
 
 
@@ -71,6 +85,20 @@ app.use('/api/doctors', DoctorRoutes);
 app.use('/api/documents', DocumentRoutes);
 app.use('/api/auth/google', GoogleAuthRoutes);
 app.use('/api/smartwatch', SmartWatchRoutes); 
+app.use('/api', TreatmentPlanRoutes);
+app.use('/api', AIRoutes);
+app.use('/api', ReminderRoutes);
+app.use('/api', NewsRoutes);
+app.use('/api', ChatbotRoutes);
+app.use('/api', AppointmentRoutes);
+app.use('/api', PatientRecordRoutes);
+app.use('/api', GuidelinesRoutes);
+app.use('/api', ConsentRoutes);
+app.use('/api', PrepRoutes);
+app.use('/api', FeedbackRoutes);
+app.use('/api', SettingsRoutes);
+app.use('/api', MedicationRoutes);
+app.use('/api', DoctorDashboardRoutes);
 
 
 app.get('/', (req, res) => {

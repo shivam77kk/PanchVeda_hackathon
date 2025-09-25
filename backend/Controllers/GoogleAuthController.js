@@ -34,9 +34,10 @@ export const initializeGoogleStrategy = () => {
             }
 
             // 2) Check existing by googleId in the other collection (in case role changed)
-            userDoc = await (role === 'patient' ? Doctor.findOne({ googleId: profile.id }) : User.findOne({ googleId: profile.id }));
+userDoc = await (role === 'patient' ? Doctor.findOne({ googleId: profile.id }) : User.findOne({ googleId: profile.id }));
             if (userDoc) {
-                userDoc.role = userDoc instanceof Doctor ? 'doctor' : 'patient';
+                const modelName = userDoc?.constructor?.modelName;
+                userDoc.role = modelName === 'Doctor' ? 'doctor' : 'patient';
                 console.log(`Existing ${userDoc.role} found with Google ID in other collection:`, userDoc.email);
                 return done(null, userDoc);
             }
@@ -52,11 +53,12 @@ export const initializeGoogleStrategy = () => {
             }
 
             // 4) Check existing by email in other collection
-            const otherDoc = await (role === 'patient' ? Doctor.findOne({ email }) : User.findOne({ email }));
+const otherDoc = await (role === 'patient' ? Doctor.findOne({ email }) : User.findOne({ email }));
             if (otherDoc) {
                 otherDoc.googleId = profile.id;
                 await otherDoc.save();
-                otherDoc.role = otherDoc instanceof Doctor ? 'doctor' : 'patient';
+                const modelName = otherDoc?.constructor?.modelName;
+                otherDoc.role = modelName === 'Doctor' ? 'doctor' : 'patient';
                 console.log(`Linked Google ID to existing ${otherDoc.role} (other collection):`, otherDoc.email);
                 return done(null, otherDoc);
             }
