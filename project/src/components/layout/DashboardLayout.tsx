@@ -1,24 +1,45 @@
 import React, { useState } from 'react';
-import Sidebar from './Sidebar';
 import Header from './Header';
-import MainContent from './MainContent';
-import MobileSidebar from './MobileSidebar';
+import Sidebar from './Sidebar';
+import DashboardContent from '../DashboardContent';
 
-const DashboardLayout: React.FC = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
 
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentView, setCurrentView] = useState('dashboard');
+
+  // Close sidebar when clicking outside on mobile
+  React.useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <div className="hidden lg:block">
-        <Sidebar />
-      </div>
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
+    <div className="min-h-screen bg-gradient-to-br from-cyan-600 to-teal-700">
+      <Header 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen}
+        currentView={currentView}
+        setCurrentView={setCurrentView}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <MainContent />
+      <div className="flex">
+        <Sidebar 
+          sidebarOpen={sidebarOpen} 
+          setSidebarOpen={setSidebarOpen}
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+        />
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 min-h-screen">
+          <DashboardContent currentView={currentView} />
+        </main>
       </div>
     </div>
   );

@@ -1,66 +1,81 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
-import { 
-  Calendar, 
-  Users, 
-  FileText, 
-  Brain, 
-  Newspaper, 
-  ClipboardList,
-  User,
-  Book,
-  FileCheck
-} from 'lucide-react';
+import { X, Activity, Calendar, Users, Package, Bot, FileText, User } from 'lucide-react';
 
-const Sidebar: React.FC = () => {
-  const { currentView, setCurrentView } = useApp();
+interface SidebarProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  currentView: string;
+  setCurrentView: (view: string) => void;
+}
 
-  const menuItems = [
-    { id: 'plans', icon: ClipboardList, label: 'Patient Plans' },
-    { id: 'patients', icon: Users, label: 'Patients' },
-    { id: 'appointments', icon: Calendar, label: 'Appointments' },
-    { id: 'guidelines', icon: Book, label: 'Guidelines' },
-    { id: 'consents', icon: FileCheck, label: 'Consents' },
-    { id: 'documents', icon: FileText, label: 'Documents' },
-    { id: 'ai-assistant', icon: Brain, label: 'AI Assistant' },
-    { id: 'profile', icon: User, label: 'Profile' },
-    { id: 'news', icon: Newspaper, label: 'News' }
+const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen, currentView, setCurrentView }) => {
+  const navigationItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Activity },
+    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'patient-history', label: 'Patient History', icon: Users },
+    { id: 'inventory', label: 'Inventory', icon: Package },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Bot },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'profile', label: 'Profile', icon: User },
   ];
 
   return (
-    <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex-shrink-0">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">P</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">PanchVeda</h1>
-            <p className="text-sm text-gray-500">Doctor Portal</p>
-          </div>
-        </div>
-      </div>
+    <>
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <nav className="mt-6 px-3 overflow-y-auto">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setCurrentView(item.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-left transition-all duration-200 mb-1 ${
-                currentView === item.id
-                  ? 'bg-green-50 text-green-700 border-r-2 border-green-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <Icon size={20} />
-              <span className="font-medium">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </div>
+      {/* Sidebar */}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 lg:hidden">
+          <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <nav className="mt-6 px-4 pb-6">
+          <ul className="space-y-2">
+            {navigationItems.map((item) => {
+              const IconComponent = item.icon;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => {
+                      setCurrentView(item.id);
+                      // Close sidebar on mobile after selection
+                      if (window.innerWidth < 1024) {
+                        setSidebarOpen(false);
+                      }
+                    }}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      currentView === item.id
+                        ? 'bg-cyan-50 text-cyan-700 border-r-2 border-cyan-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <IconComponent className={`h-5 w-5 mr-3 ${
+                      currentView === item.id ? 'text-cyan-600' : 'text-gray-400'
+                    }`} />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
+    </>
   );
 };
 
