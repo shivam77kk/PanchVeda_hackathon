@@ -50,11 +50,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 mongoose.connect(MONGO_URI)
-    .then(() => {
-        console.log('MongoDB connected successfully.');
+    .then(async () => {
+        console.log('✅ MongoDB connected successfully.');
+        console.log('📊 Database:', mongoose.connection.name || 'default');
+        console.log('🌐 Host:', mongoose.connection.host);
+        
+        // Verify collections can be accessed
+        try {
+            const collections = await mongoose.connection.db.listCollections().toArray();
+            console.log('📁 Available collections:', collections.map(c => c.name));
+        } catch (err) {
+            console.warn('⚠️  Could not list collections:', err.message);
+        }
     })
     .catch((err) => {
-        console.error('MongoDB connection failed:', err.message);
+        console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);
     });
 
@@ -83,6 +93,27 @@ initializeGoogleStrategy();
 app.use('/api/users', UserRoutes);
 app.use('/api/doctors', DoctorRoutes);
 app.use('/api/documents', DocumentRoutes);
+// Debug middleware for Google Auth routes
+app.use('/api/auth/google', (req, res, next) => {
+    console.log(`\n🔍 [Google Auth] ${req.method} ${req.url}`);
+    console.log('📡 Headers:', req.headers['user-agent'] || 'Unknown');
+    console.log('🔗 Query:', req.query);
+    console.log('👤 Session ID:', req.sessionID || 'No session');
+    console.log('🕐 Timestamp:', new Date().toISOString());
+    
+    // Track callback requests specifically
+    if (req.url.includes('/callback')) {
+        console.log('🎯 OAUTH CALLBACK DETECTED!');
+        console.log('📋 Full URL:', req.originalUrl);
+        console.log('🔐 Auth Code Present:', !!req.query.code);
+        console.log('❌ Error Present:', !!req.query.error);
+        if (req.query.error) {
+            console.log('⚠️ OAuth Error:', req.query.error, req.query.error_description);
+        }
+    }
+    next();
+});
+
 app.use('/api/auth/google', GoogleAuthRoutes);
 app.use('/api/smartwatch', SmartWatchRoutes); 
 app.use('/api', TreatmentPlanRoutes);
