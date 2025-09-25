@@ -1,13 +1,22 @@
 import express from 'express';
 import passport from 'passport';
-import { googleCallbackHandler, logoutHandler } from '../Controllers/GoogleAuthControllers.js';
+import { googleCallbackHandler, logoutHandler } from '../Controllers/GoogleAuthController.js';
 
 const router = express.Router();
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+// Patient Google OAuth
+router.get('/patient', passport.authenticate('google-patient', { scope: ['profile', 'email'] }));
+router.get('/patient/callback',
+    passport.authenticate('google-patient', {
+        failureRedirect: 'http://localhost:3000/login?error=google_auth_failed'
+    }),
+    googleCallbackHandler
+);
 
-router.get('/google/callback',
-    passport.authenticate('google', {
+// Doctor Google OAuth
+router.get('/doctor', passport.authenticate('google-doctor', { scope: ['profile', 'email'] }));
+router.get('/doctor/callback',
+    passport.authenticate('google-doctor', {
         failureRedirect: 'http://localhost:3000/login?error=google_auth_failed'
     }),
     googleCallbackHandler

@@ -13,8 +13,9 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     process.exit(1);
 }
 
-if (!process.env.MONGO_URI) {
-    console.error('Error: MONGO_URI is not defined in .env file');
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGO_URL;
+if (!MONGO_URI) {
+    console.error('Error: MONGO_URI/MONGO_URL is not defined in .env file');
     process.exit(1);
 }
 
@@ -34,7 +35,7 @@ import { initializeGoogleStrategy } from './Controllers/GoogleAuthController.js'
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(MONGO_URI)
     .then(() => {
         console.log('MongoDB connected successfully.');
     })

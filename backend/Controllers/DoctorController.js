@@ -192,6 +192,47 @@ export const getDoctorDocuments = async (req, res) => {
     }
 };
 
+export const viewDoctorDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const doctorId = req.user.id;
+
+        const document = await DoctorDocument.findOne({ _id: documentId, doctorId });
+
+        if (!document) {
+            return res.status(404).json({ message: "Document not found or does not belong to this doctor." });
+        }
+
+        res.status(200).json({
+            message: "Document retrieved successfully",
+            document
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Error retrieving document", error: error.message });
+    }
+};
+
+export const deleteDoctorDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const doctorId = req.user.id;
+
+        const document = await DoctorDocument.findOne({ _id: documentId, doctorId });
+
+        if (!document) {
+            return res.status(404).json({ message: "Document not found or does not belong to this doctor." });
+        }
+
+        await cloudinary.uploader.destroy(document.publicId);
+
+        await DoctorDocument.findByIdAndDelete(documentId);
+
+        res.status(200).json({ message: "Document deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Error deleting document", error: error.message });
+    }
+};
+
 export const getPatientHistory = async (req, res) => {
     try {
         const { id } = req.params;
@@ -201,7 +242,7 @@ export const getPatientHistory = async (req, res) => {
             return res.status(404).json({ message: "Patient not found" });
         }
 
-        const healthLogs = await HealthLog.find({ userId: patient._id }).sort({ date: -1 });
+        // Health logs model not available; returning documents only
         const documents = await Document.find({ userId: patient._id }).sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -215,7 +256,7 @@ export const getPatientHistory = async (req, res) => {
                 bloodGroup: patient.bloodGroup
             },
             history: {
-                healthLogs,
+                healthLogs: [],
                 documents
             }
         });

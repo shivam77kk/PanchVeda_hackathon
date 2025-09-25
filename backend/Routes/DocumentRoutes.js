@@ -1,5 +1,5 @@
 import express from 'express';
-import { uploadDocument, getDocuments, deleteDocument } from '../Controllers/DoctorController.js';
+import { uploadDocument, getDocuments, deleteDocument } from '../Controllers/DocumentController.js';
 import { authenticateToken, isPatient } from '../Middlewares/AuthMIddleware.js';
 import { upload } from '../Middlewares/multer.config.js';
 

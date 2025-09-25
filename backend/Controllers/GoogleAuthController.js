@@ -5,76 +5,104 @@ import Doctor from '../models/DoctorSchema.js';
 import jwt from 'jsonwebtoken';
 
 export const initializeGoogleStrategy = () => {
-    // console.log('Initializing Google Strategy...');
-    // console.log('Google Client ID:', process.env.GOOGLE_CLIENT_ID);
-    // console.log('Google Client Secret:', process.env.GOOGLE_CLIENT_SECRET);
-
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         throw new Error('GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not defined');
     }
 
-    passport.use(new GoogleStrategy({
+    const PORT = process.env.PORT || 5000;
+    const patientCallbackURL = process.env.GOOGLE_REDIRECT_URI_ || `http://localhost:${PORT}/api/auth/google/patient/callback`;
+    const doctorCallbackURL = process.env.GOOGLE_DOCTOR_REDIRECT_URI || `http://localhost:${PORT}/api/auth/google/doctor/callback`;
+
+    const buildStrategy = (role, callbackURL) => new GoogleStrategy({
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: 'http://localhost:5000/api/auth/google/callback'
+        callbackURL
     }, async (accessToken, refreshToken, profile, done) => {
-        console.log('Google Strategy Callback - Profile:', profile.id);
+        console.log(`[Google ${role}] Strategy Callback - Profile:`, profile.id);
         try {
-            const email = profile.emails[0].value;
-            console.log('OAuth callback - Email:', email);
-            
-            let user = await User.findOne({ googleId: profile.id });
-            if (user) {
-                user.role = 'patient';
-                console.log('Existing patient found with Google ID:', user.email);
-                return done(null, user);
-            }
-            
-            user = await Doctor.findOne({ googleId: profile.id });
-            if (user) {
-                user.role = 'doctor';
-                console.log('Existing doctor found with Google ID:', user.email);
-                return done(null, user);
+            const email = profile.emails && profile.emails[0] && profile.emails[0].value;
+            if (!email) {
+                return done(new Error('Email not provided by Google'), null);
             }
 
-            user = await User.findOne({ email });
-            if (user) {
-                user.googleId = profile.id;
-                await user.save();
-                user.role = 'patient';
-                console.log('Linked Google ID to existing patient:', user.email);
-                return done(null, user);
+            // 1) Check existing by googleId
+            let userDoc = await (role === 'patient' ? User.findOne({ googleId: profile.id }) : Doctor.findOne({ googleId: profile.id }));
+            if (userDoc) {
+                userDoc.role = role;
+                console.log(`Existing ${role} found with Google ID:`, userDoc.email);
+                return done(null, userDoc);
             }
-            
-            user = await Doctor.findOne({ email });
-            if (user) {
-                user.googleId = profile.id;
-                await user.save();
-                user.role = 'doctor';
-                console.log('Linked Google ID to existing doctor:', user.email);
-                return done(null, user);
+
+            // 2) Check existing by googleId in the other collection (in case role changed)
+            userDoc = await (role === 'patient' ? Doctor.findOne({ googleId: profile.id }) : User.findOne({ googleId: profile.id }));
+            if (userDoc) {
+                userDoc.role = userDoc instanceof Doctor ? 'doctor' : 'patient';
+                console.log(`Existing ${userDoc.role} found with Google ID in other collection:`, userDoc.email);
+                return done(null, userDoc);
             }
-            
-            console.log('Creating new patient for Google user:', email); // might to create for same for doctor too
-            user = new User({
-                googleId: profile.id,
-                name: profile.displayName,
-                email: email,
-                age: 25, 
-                gender: 'Other',
-                bloodGroup: 'O+',
-                refreshToken: ''
-            });
-            await user.save();
-            user.role = 'patient';
-            console.log('New patient created:', user._id);
-            
-            done(null, user);
+
+            // 3) Check existing by email in intended collection
+            userDoc = await (role === 'patient' ? User.findOne({ email }) : Doctor.findOne({ email }));
+            if (userDoc) {
+                userDoc.googleId = profile.id;
+                await userDoc.save();
+                userDoc.role = role;
+                console.log(`Linked Google ID to existing ${role}:`, userDoc.email);
+                return done(null, userDoc);
+            }
+
+            // 4) Check existing by email in other collection
+            const otherDoc = await (role === 'patient' ? Doctor.findOne({ email }) : User.findOne({ email }));
+            if (otherDoc) {
+                otherDoc.googleId = profile.id;
+                await otherDoc.save();
+                otherDoc.role = otherDoc instanceof Doctor ? 'doctor' : 'patient';
+                console.log(`Linked Google ID to existing ${otherDoc.role} (other collection):`, otherDoc.email);
+                return done(null, otherDoc);
+            }
+
+            // 5) Create a new doc in intended collection
+            if (role === 'doctor') {
+                console.log('Creating new doctor for Google user:', email);
+                const newDoctor = new Doctor({
+                    googleId: profile.id,
+                    name: profile.displayName,
+                    email,
+                    age: 30,
+                    experience: 0,
+                    mode: 'Both',
+                    specialization: 'General Practice',
+                    refreshToken: ''
+                });
+                await newDoctor.save();
+                newDoctor.role = 'doctor';
+                console.log('New doctor created:', newDoctor._id);
+                return done(null, newDoctor);
+            } else {
+                console.log('Creating new patient for Google user:', email);
+                const newUser = new User({
+                    googleId: profile.id,
+                    name: profile.displayName,
+                    email,
+                    age: 25,
+                    gender: 'Other',
+                    bloodGroup: 'O+',
+                    refreshToken: ''
+                });
+                await newUser.save();
+                newUser.role = 'patient';
+                console.log('New patient created:', newUser._id);
+                return done(null, newUser);
+            }
         } catch (error) {
-            console.error('Error in Google Strategy callback:', error.message);
-            done(error, null);
+            console.error(`[Google ${role}] Error in Strategy callback:`, error.message);
+            return done(error, null);
         }
-    }));
+    });
+
+    // Register two named strategies
+    passport.use('google-patient', buildStrategy('patient', patientCallbackURL));
+    passport.use('google-doctor', buildStrategy('doctor', doctorCallbackURL));
 };
 
 passport.serializeUser((user, done) => {
@@ -85,7 +113,10 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
     console.log('Deserializing user:', id);
     try {
-        const user = await User.findById(id);
+        let user = await User.findById(id);
+        if (!user) {
+            user = await Doctor.findById(id);
+        }
         done(null, user);
     } catch (error) {
         console.error('Error in deserializeUser:', error.message);

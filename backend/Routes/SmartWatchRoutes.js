@@ -1,12 +1,12 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/AuthMiddleware.js';
+import { authenticateToken } from '../Middlewares/AuthMIddleware.js';
 import {
     initiateGoogleFitAuth,
     handleGoogleFitCallback,
     syncAndCleanData,
     getSmartwatchData,
     getLatestVitals
-} from '../controllers/SmartWatchController.js';
+} from '../Controllers/SmartWatchController.js';
 
 const router = express.Router();
 
