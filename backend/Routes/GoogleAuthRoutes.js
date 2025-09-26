@@ -26,6 +26,10 @@ router.get('/patient/callback',
     (req, res, next) => {
         console.log('Patient callback route hit:', req.url);
         console.log('Query params:', req.query);
+        // If Google didn't return a code (often shows as scope error), restart the flow
+        if (!req.query.code && !req.query.state) {
+            return res.redirect('/api/auth/google/patient');
+        }
         next();
     },
     passport.authenticate('google-patient', {
@@ -48,6 +52,9 @@ router.get('/doctor/callback',
     (req, res, next) => {
         console.log('Doctor callback route hit:', req.url);
         console.log('Query params:', req.query);
+        if (!req.query.code && !req.query.state) {
+            return res.redirect('/api/auth/google/doctor');
+        }
         next();
     },
     passport.authenticate('google-doctor', {
@@ -67,6 +74,19 @@ router.get('/health', (req, res) => {
         oauth_configured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
         mongodb_connected: mongoose.connection.readyState === 1,
         database_name: mongoose.connection.name
+    });
+});
+
+// Inspect current Google OAuth configuration (masked)
+router.get('/config', (req, res) => {
+    res.json({
+        callbacks: {
+            patient: process.env.GOOGLE_PATIENT_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI,
+            doctor: process.env.GOOGLE_DOCTOR_REDIRECT_URI
+        },
+        clientId_tail: process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.slice(-12) : 'missing',
+        clientSecret_set: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -176,6 +196,30 @@ router.post('/test-create-user', async (req, res) => {
             error: error.message,
             timestamp: new Date().toISOString()
         });
+    }
+});
+
+// Convenience GET variant so you can test from the browser address bar
+router.get('/test-create-user', async (req, res) => {
+    try {
+        const User = (await import('../models/UserSchema.js')).default;
+        const testUser = new User({
+            googleId: `test_${Date.now()}`,
+            name: 'Test OAuth User',
+            email: `test${Date.now()}@example.com`,
+            age: 25,
+            gender: 'Other',
+            bloodGroup: 'O+',
+            refreshToken: ''
+        });
+        const savedUser = await testUser.save();
+        res.json({
+            status: 'ok',
+            id: savedUser._id,
+            email: savedUser.email
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
