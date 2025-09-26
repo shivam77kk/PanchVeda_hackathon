@@ -20,26 +20,37 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const endpoint = isLogin ? '/auth/login' : '/auth/register'
+      const endpoint = userType === 'patient' 
+        ? (isLogin ? '/users/login' : '/users/register')
+        : (isLogin ? '/doctors/login' : '/doctors/register')
+      
       const payload = isLogin 
-        ? { email, password, userType }
-        : { email, password, fullName, userType, specialization, experience }
+        ? { email, password }
+        : userType === 'patient'
+          ? { name: fullName, email, password, age: 25, gender: 'Other', bloodGroup: 'O+' }
+          : { name: fullName, email, password, age: 30, specialization, experience: parseInt(experience) || 0, mode: 'Both' }
       
       const response = await axios.post(`${API_BASE}${endpoint}`, payload)
       
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token)
+      if (response.data.accessToken) {
+        localStorage.setItem('token', response.data.accessToken)
         localStorage.setItem('user', JSON.stringify(response.data.user))
         router.push('/dashboard')
       }
     } catch (error) {
       console.error('Auth error:', error)
-      alert(error.response?.data?.message || 'Authentication failed')
+      const message = error.response?.data?.message || 'Authentication failed'
+      if (error.response?.status === 409) {
+        alert('User already exists. Please try logging in instead.')
+        setIsLogin(true)
+      } else {
+        alert(message)
+      }
     }
   }
 
   const handleGoogleAuth = () => {
-    const googleRoute = userType === 'patient' ? '/google/patient' : '/google/doctor'
+    const googleRoute = userType === 'patient' ? '/auth/google/patient' : '/auth/google/doctor'
     window.location.href = `${API_BASE}${googleRoute}`
   }
 

@@ -39,16 +39,17 @@ export default function Dashboard() {
     // Check for OAuth redirect parameters
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
-    const user = urlParams.get('user')
+    const userParam = urlParams.get('user')
     const authSuccess = urlParams.get('auth_success')
     const tab = urlParams.get('tab')
     const startQuiz = urlParams.get('startQuiz')
     
-    if (authSuccess && token && user) {
+    if (authSuccess && token && userParam) {
       try {
-        const userData = JSON.parse(decodeURIComponent(user))
+        const userData = JSON.parse(decodeURIComponent(userParam))
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(userData))
+        setUser(userData)
         // Clean URL
         window.history.replaceState({}, document.title, '/dashboard')
       } catch (error) {
@@ -65,15 +66,18 @@ export default function Dashboard() {
     }
     
     const storedToken = localStorage.getItem('token')
-    if (storedToken) {
-      loadUserData()
-      loadAppointments()
-      loadDocuments()
-      loadIotDevices()
-      loadSettings()
-    } else {
-      setLoading(false)
+    const storedUser = localStorage.getItem('user')
+    
+    if (storedToken && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser)
+        setUser(userData)
+      } catch (error) {
+        console.error('Error parsing stored user:', error)
+      }
     }
+    
+    setLoading(false)
   }, [])
   
   // API Functions
@@ -250,7 +254,7 @@ export default function Dashboard() {
     
     setDoshaResult(result)
     setQuizCompleted(true)
-    await saveDoshaResult(result)
+    saveDoshaResult(result)
   }
 
   const resetQuiz = () => {
@@ -384,15 +388,8 @@ export default function Dashboard() {
   }
   
   // Dosha Quiz Backend Integration
-  const saveDoshaResult = async (result) => {
-    try {
-      const token = localStorage.getItem('token')
-      await axios.post(`${API_BASE}/user/dosha`, result, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-    } catch (error) {
-      console.error('Error saving dosha result:', error)
-    }
+  const saveDoshaResult = (result) => {
+    console.log('Dosha result:', result)
   }
   
   // Appointment Booking
@@ -495,6 +492,17 @@ export default function Dashboard() {
     { name: 'Book Appointment', icon: '📅', color: 'bg-green-50 text-green-600' },
     { name: 'Learn', icon: '📚', color: 'bg-purple-50 text-purple-600' }
   ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
