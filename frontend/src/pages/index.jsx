@@ -6,8 +6,11 @@ import FiveTherapies from '../components/FiveTherapies'
 import DoshaDiscovery from '../components/DoshaDiscovery'
 import CallToAction from '../components/CallToAction'
 import Footer from '../components/Footer'
+import { useDarkMode } from '@/contexts/DarkModeContext'
 
 export default function Home() {
+  const { isDarkMode } = useDarkMode()
+  
   return (
     <>
       <Head>
@@ -17,7 +20,7 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       
-      <main className="bg-green-50 min-h-screen">
+      <main className="bg-green-50 dark:bg-gray-900 min-h-screen">
         <Header />
         <HeroSection />
         <WhyChoose />

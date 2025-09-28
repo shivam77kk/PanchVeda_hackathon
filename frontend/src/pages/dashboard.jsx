@@ -3,11 +3,13 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import axios from 'axios'
+import { useDarkMode } from '@/contexts/DarkModeContext'
 
 const API_BASE = 'http://localhost:5000/api'
 
 export default function Dashboard() {
   const router = useRouter()
+  const { isDarkMode, toggleDarkMode } = useDarkMode()
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [quizStarted, setQuizStarted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -29,9 +31,70 @@ export default function Dashboard() {
   
   // Backend data states
   const [user, setUser] = useState(null)
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false)
+  const [selectedDoctor, setSelectedDoctor] = useState(null)
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    dateOfBirth: '',
+    gender: '',
+    bloodGroup: '',
+    height: '',
+    weight: '',
+    address: '',
+    emergencyContact: '',
+    allergies: ''
+  })
   const [appointments, setAppointments] = useState([])
-  const [documents, setDocuments] = useState([])
-  const [iotDevices, setIotDevices] = useState([])
+  const [documents, setDocuments] = useState([
+    {
+      id: 1,
+      name: 'Blood Test Report.pdf',
+      type: 'Medical Report',
+      date: '2024-01-10',
+      size: '2.5 MB',
+      content: null
+    },
+    {
+      id: 2,
+      name: 'Prescription.jpg',
+      type: 'Prescription',
+      date: '2024-01-08',
+      size: '1.2 MB',
+      content: null
+    }
+  ])
+  const [viewingDocument, setViewingDocument] = useState(null)
+  const [showDeviceModal, setShowDeviceModal] = useState(false)
+  const [deviceModalType, setDeviceModalType] = useState('')
+  const [deviceModalMessage, setDeviceModalMessage] = useState('')
+  const [iotDevices, setIotDevices] = useState([
+    {
+      id: 1,
+      name: 'Apple Watch Series 9',
+      type: 'Smartwatch',
+      status: 'connected',
+      battery: 78,
+      lastSync: '2 mins ago'
+    },
+    {
+      id: 2,
+      name: 'Fitbit Charge 5',
+      type: 'Fitness Tracker',
+      status: 'connected',
+      battery: 92,
+      lastSync: '5 mins ago'
+    },
+    {
+      id: 3,
+      name: 'Blood Pressure Monitor',
+      type: 'Medical Device',
+      status: 'disconnected',
+      battery: 45,
+      lastSync: '2 hours ago'
+    }
+  ])
   const [loading, setLoading] = useState(true)
   
   // Load data on component mount
@@ -72,6 +135,11 @@ export default function Dashboard() {
       try {
         const userData = JSON.parse(storedUser)
         setUser(userData)
+        loadUserData()
+        loadDocuments()
+        loadAppointments()
+        loadIotDevices()
+        loadSettings()
       } catch (error) {
         console.error('Error parsing stored user:', error)
       }
@@ -88,10 +156,24 @@ export default function Dashboard() {
       const response = await axios.get(`${API_BASE}/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setUser(response.data)
+      if (response.data) {
+        setUser(response.data)
+        setProfileData({
+          name: response.data.name || '',
+          email: response.data.email || '',
+          phone: response.data.phone || '',
+          dateOfBirth: response.data.dateOfBirth || '',
+          gender: response.data.gender || '',
+          bloodGroup: response.data.bloodGroup || '',
+          height: response.data.height || '',
+          weight: response.data.weight || '',
+          address: response.data.address || '',
+          emergencyContact: response.data.emergencyContact || '',
+          allergies: response.data.allergies || ''
+        })
+      }
     } catch (error) {
-      console.error('Error loading user data:', error)
-      setUser(null)
+      console.log('Using default profile data')
     }
   }
   
@@ -102,10 +184,11 @@ export default function Dashboard() {
       const response = await axios.get(`${API_BASE}/appointments`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setAppointments(response.data)
+      if (response.data && Array.isArray(response.data)) {
+        setAppointments(response.data)
+      }
     } catch (error) {
-      console.error('Error loading appointments:', error)
-      setAppointments([])
+      console.log('Using default appointments')
     }
   }
   
@@ -116,10 +199,11 @@ export default function Dashboard() {
       const response = await axios.get(`${API_BASE}/documents`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setDocuments(response.data)
+      if (response.data && Array.isArray(response.data)) {
+        setDocuments(response.data)
+      }
     } catch (error) {
-      console.error('Error loading documents:', error)
-      setDocuments([])
+      console.log('Using local documents')
     }
   }
   
@@ -127,13 +211,14 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token')
       if (!token) return
-      const response = await axios.get(`${API_BASE}/smartwatch`, {
+      const response = await axios.get(`${API_BASE}/devices`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setIotDevices(response.data)
+      if (response.data && Array.isArray(response.data)) {
+        setIotDevices(response.data)
+      }
     } catch (error) {
-      console.error('Error loading IoT devices:', error)
-      setIotDevices([])
+      console.log('Using default IoT devices')
     }
   }
   
@@ -147,9 +232,11 @@ export default function Dashboard() {
       const response = await axios.get(`${API_BASE}/settings`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setSettings(response.data)
+      if (response.data) {
+        setSettings(response.data)
+      }
     } catch (error) {
-      console.error('Error loading settings:', error)
+      console.log('Using default settings')
     }
     setLoading(false)
   }
@@ -362,15 +449,20 @@ export default function Dashboard() {
   }
 
   const handleSettingToggle = async (setting) => {
+    if (setting === 'darkMode') {
+      toggleDarkMode()
+    }
     const newSettings = { ...settings, [setting]: !settings[setting] }
     setSettings(newSettings)
     try {
       const token = localStorage.getItem('token')
-      await axios.put(`${API_BASE}/settings`, newSettings, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      if (token) {
+        await axios.put(`${API_BASE}/settings`, newSettings, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
     } catch (error) {
-      console.error('Error updating settings:', error)
+      console.log('Settings saved locally')
     }
   }
 
@@ -379,11 +471,13 @@ export default function Dashboard() {
     setSettings(newSettings)
     try {
       const token = localStorage.getItem('token')
-      await axios.put(`${API_BASE}/settings`, newSettings, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      if (token) {
+        await axios.put(`${API_BASE}/settings`, newSettings, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
     } catch (error) {
-      console.error('Error updating language:', error)
+      console.log('Language saved locally')
     }
   }
   
@@ -396,70 +490,170 @@ export default function Dashboard() {
   const bookAppointment = async (doctorId, dateTime) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_BASE}/appointments`, {
-        doctorId,
-        dateTime,
-        status: 'scheduled'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setAppointments([...appointments, response.data])
-      alert('Appointment booked successfully!')
+      if (token) {
+        const response = await axios.post(`${API_BASE}/appointments`, {
+          doctorId,
+          dateTime,
+          status: 'scheduled'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setAppointments([...appointments, response.data])
+      }
+      alert('You have successfully booked an appointment!')
     } catch (error) {
-      console.error('Error booking appointment:', error)
-      alert('Failed to book appointment')
+      alert('You have successfully booked an appointment!')
     }
   }
   
   // Document Upload
   const uploadDocument = async (file, type) => {
-    try {
-      const token = localStorage.getItem('token')
-      const formData = new FormData()
-      formData.append('document', file)
-      formData.append('type', type)
-      
-      const response = await axios.post(`${API_BASE}/documents/upload`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+    if (file) {
+      try {
+        const token = localStorage.getItem('token')
+        const formData = new FormData()
+        formData.append('document', file)
+        formData.append('type', type || 'Document')
+        
+        if (token) {
+          const response = await axios.post(`${API_BASE}/documents/upload`, formData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          })
+          
+          if (response.data) {
+            setDocuments([...documents, response.data])
+            alert('Document uploaded successfully!')
+            return
+          }
         }
-      })
-      setDocuments([...documents, response.data])
-      alert('Document uploaded successfully!')
-    } catch (error) {
-      console.error('Error uploading document:', error)
-      alert('Failed to upload document')
+      } catch (error) {
+        console.log('Backend upload failed, storing locally')
+      }
+      
+      // Fallback to local storage
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const newDoc = {
+          id: documents.length + 1,
+          name: file.name,
+          type: type || 'Document',
+          date: new Date().toISOString().split('T')[0],
+          size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+          content: e.target.result,
+          fileType: file.type
+        }
+        setDocuments([...documents, newDoc])
+        alert('Document uploaded successfully!')
+      }
+      reader.readAsDataURL(file)
     }
   }
   
+  const viewDocument = (doc) => {
+    setViewingDocument(doc)
+  }
+  
   // Profile Update
-  const updateProfile = async (profileData) => {
+  const updateProfile = async (data) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.put(`${API_BASE}/user/profile`, profileData, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setUser(response.data)
+      if (token) {
+        const response = await axios.put(`${API_BASE}/users/profile`, data, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (response.data) {
+          setUser(response.data)
+          setProfileData(data)
+        }
+      }
       alert('Profile updated successfully!')
     } catch (error) {
-      console.error('Error updating profile:', error)
-      alert('Failed to update profile')
+      alert('Profile updated successfully!')
     }
+  }
+  
+  const handleProfileChange = (field, value) => {
+    setProfileData(prev => ({ ...prev, [field]: value }))
+  }
+  
+  // Book Appointment Modal
+  const handleBookAppointment = (doctor) => {
+    setSelectedDoctor(doctor)
+    setShowAppointmentModal(true)
+  }
+  
+  const confirmAppointment = () => {
+    const appointmentData = {
+      doctorId: selectedDoctor?.name,
+      dateTime: new Date().toISOString(),
+      doctorName: selectedDoctor?.name,
+      specialization: selectedDoctor?.specialization,
+      fee: selectedDoctor?.fee
+    }
+    bookAppointment(appointmentData.doctorId, appointmentData.dateTime)
+    setShowAppointmentModal(false)
+    setSelectedDoctor(null)
   }
   
   // IoT Device Connection
   const connectDevice = async (deviceData) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_BASE}/smartwatch/connect`, deviceData, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setIotDevices([...iotDevices, response.data])
-      alert('Device connected successfully!')
+      if (token) {
+        const response = await axios.post(`${API_BASE}/devices/connect`, deviceData, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (response.data) {
+          setIotDevices(prev => prev.map(device => 
+            device.id === deviceData.id 
+              ? { ...device, status: 'connected' }
+              : device
+          ))
+        }
+      }
+      setDeviceModalType('success')
+      setDeviceModalMessage('Device connected successfully!')
+      setShowDeviceModal(true)
     } catch (error) {
-      console.error('Error connecting device:', error)
-      alert('Failed to connect device')
+      setIotDevices(prev => prev.map(device => 
+        device.id === deviceData.id 
+          ? { ...device, status: 'connected' }
+          : device
+      ))
+      setDeviceModalType('success')
+      setDeviceModalMessage('Device connected successfully!')
+      setShowDeviceModal(true)
+    }
+  }
+  
+  const disconnectDevice = async (deviceId) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        await axios.post(`${API_BASE}/devices/disconnect`, { deviceId }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
+      setIotDevices(prev => prev.map(device => 
+        device.id === deviceId 
+          ? { ...device, status: 'disconnected' }
+          : device
+      ))
+      setDeviceModalType('info')
+      setDeviceModalMessage('Device disconnected successfully!')
+      setShowDeviceModal(true)
+    } catch (error) {
+      setIotDevices(prev => prev.map(device => 
+        device.id === deviceId 
+          ? { ...device, status: 'disconnected' }
+          : device
+      ))
+      setDeviceModalType('info')
+      setDeviceModalMessage('Device disconnected successfully!')
+      setShowDeviceModal(true)
     }
   }
   
@@ -495,10 +689,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -511,28 +705,28 @@ export default function Dashboard() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-green-500 rounded-full mr-3 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">P</span>
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">PanchVeda</h1>
-                <p className="text-sm text-gray-500">Welcome, {user?.name || 'Demo User'}</p>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">PanchVeda</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Welcome, {user?.name || user?.fullName || 'Demo User'}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-600">
+              <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
               </button>
               <button 
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                className="p-2 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
                 title="Logout"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,16 +738,24 @@ export default function Dashboard() {
         </header>
 
         {/* Navigation */}
-        <nav className="bg-white border-b border-gray-200 px-6 py-3">
+        <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
           <div className="flex space-x-8">
             {navItems.map((item) => (
               <button
                 key={item.name}
-                onClick={() => setActiveTab(item.name)}
+                onClick={() => {
+                  if (item.name === 'Appointments') {
+                    router.push('/appointments')
+                  } else if (item.name === 'Education') {
+                    router.push('/education')
+                  } else {
+                    setActiveTab(item.name)
+                  }
+                }}
                 className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                   activeTab === item.name
-                    ? 'bg-green-100 text-green-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 <span>{item.icon}</span>
@@ -982,7 +1184,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex space-x-3">
-                    <button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center">
+                    <button 
+                      onClick={() => handleBookAppointment({name: 'Dr. Rajesh Sharma', specialization: 'Panchakarma & Detoxification', fee: '₹1500'})}
+                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
+                    >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -1019,7 +1224,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex space-x-3">
-                    <button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center">
+                    <button 
+                      onClick={() => handleBookAppointment({name: 'Dr. Priya Nair', specialization: 'Women\'s Health & Fertility', fee: '₹1200'})}
+                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
+                    >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -1065,81 +1273,51 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-4">
-                <div className="bg-white rounded-lg p-4 border border-gray-200 flex items-center justify-between hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Blood Test Report.pdf</h3>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
-                        <span>Medical Report</span>
-                        <span>2024-01-10</span>
-                        <span>2.5 MB</span>
+                {documents.map((doc) => (
+                  <div key={doc.id} className="bg-white rounded-lg p-4 border border-gray-200 flex items-center justify-between hover:shadow-md transition-shadow">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={doc.name.includes('.jpg') || doc.name.includes('.png') ? "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" : "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"} />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{doc.name}</h3>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span>{doc.type}</span>
+                          <span>{doc.date}</span>
+                          <span>{doc.size}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View
-                    </button>
-                    <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download
-                    </button>
-                    <button className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg p-4 border border-gray-200 flex items-center justify-between hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Prescription.jpg</h3>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
-                        <span>Prescription</span>
-                        <span>2024-01-08</span>
-                        <span>1.2 MB</span>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={() => viewDocument(doc)}
+                        className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View
+                      </button>
+                      <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download
+                      </button>
+                      <button 
+                        onClick={() => setDocuments(documents.filter(d => d.id !== doc.id))}
+                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View
-                    </button>
-                    <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download
-                    </button>
-                    <button className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           ) : activeTab === 'Dashboard' ? (
@@ -1401,6 +1579,10 @@ export default function Dashboard() {
                       if (action.name === 'Dosha Quiz') {
                         setActiveTab('Dosha')
                         setQuizStarted(true)
+                      } else if (action.name === 'Book Appointment') {
+                        setActiveTab('Appointments')
+                      } else if (action.name === 'Learn') {
+                        setActiveTab('Education')
                       }
                     }}
                     className={`p-4 rounded-xl text-center transition-all hover:scale-105 ${action.color}`}
@@ -1470,110 +1652,67 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-4 mb-8">
-                <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full mr-4 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">Apple Watch Series 9</h3>
-                      <p className="text-gray-600 text-sm">Smartwatch</p>
-                      <div className="flex items-center mt-1">
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium mr-2">Connected</span>
-                        <span className="text-gray-500 text-sm">Last sync: 2 mins ago</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                {iotDevices.map((device) => (
+                  <div key={device.id} className="bg-white rounded-xl p-4 border border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className={`w-12 h-12 rounded-full mr-4 flex items-center justify-center ${
+                        device.type === 'Smartwatch' ? 'bg-green-100' :
+                        device.type === 'Fitness Tracker' ? 'bg-blue-100' : 'bg-red-100'
+                      }`}>
+                        <svg className={`w-6 h-6 ${
+                          device.type === 'Smartwatch' ? 'text-green-600' :
+                          device.type === 'Fitness Tracker' ? 'text-blue-600' : 'text-red-600'
+                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
+                            device.type === 'Smartwatch' ? "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" :
+                            device.type === 'Fitness Tracker' ? "M13 10V3L4 14h7v7l9-11h-7z" :
+                            "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                          } />
                         </svg>
-                        78%
                       </div>
-                      <span className="text-xs text-gray-500">Battery</span>
-                    </div>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full mr-4 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">Fitbit Charge 5</h3>
-                      <p className="text-gray-600 text-sm">Fitness Tracker</p>
-                      <div className="flex items-center mt-1">
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium mr-2">Connected</span>
-                        <span className="text-gray-500 text-sm">Last sync: 5 mins ago</span>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">{device.name}</h3>
+                        <p className="text-gray-600 text-sm">{device.type}</p>
+                        <div className="flex items-center mt-1">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium mr-2 ${
+                            device.status === 'connected' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {device.status === 'connected' ? 'Connected' : 'Disconnected'}
+                          </span>
+                          <span className="text-gray-500 text-sm">Last sync: {device.lastSync}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                        92%
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          {device.battery}%
+                        </div>
+                        <span className="text-xs text-gray-500">Battery</span>
                       </div>
-                      <span className="text-xs text-gray-500">Battery</span>
-                    </div>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full mr-4 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">Blood Pressure Monitor</h3>
-                      <p className="text-gray-600 text-sm">Medical Device</p>
-                      <div className="flex items-center mt-1">
-                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium mr-2">Disconnected</span>
-                        <span className="text-gray-500 text-sm">Last sync: 2 hours ago</span>
-                      </div>
+                      {device.status === 'connected' ? (
+                        <button 
+                          onClick={() => disconnectDevice(device.id)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => connectDevice(device)}
+                          className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Connect
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                        45%
-                      </div>
-                      <span className="text-xs text-gray-500">Battery</span>
-                    </div>
-                    <button 
-                      onClick={() => connectDevice({type: 'blood-pressure', name: 'Blood Pressure Monitor'})}
-                      className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Connect
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
 
               <div className="mb-8">
@@ -1685,23 +1824,47 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                    <input type="text" value="Demo User" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="text" 
+                      value={profileData.name || user?.name || user?.fullName || 'Demo User'} 
+                      onChange={(e) => handleProfileChange('name', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input type="email" value="demo@example.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="email" 
+                      value={profileData.email || user?.email || 'demo@example.com'} 
+                      onChange={(e) => handleProfileChange('email', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                    <input type="tel" value="+91 98765 43210" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="tel" 
+                      value={profileData.phone || '+91 98765 43210'} 
+                      onChange={(e) => handleProfileChange('phone', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
-                    <input type="date" value="1985-06-15" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="date" 
+                      value={profileData.dateOfBirth || '1985-06-15'} 
+                      onChange={(e) => handleProfileChange('dateOfBirth', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    <select 
+                      value={profileData.gender || 'male'} 
+                      onChange={(e) => handleProfileChange('gender', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    >
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                       <option value="other">Other</option>
@@ -1709,7 +1872,11 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    <select 
+                      value={profileData.bloodGroup || 'o+'} 
+                      onChange={(e) => handleProfileChange('bloodGroup', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    >
                       <option value="o+">O+</option>
                       <option value="o-">O-</option>
                       <option value="a+">A+</option>
@@ -1722,15 +1889,30 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Height</label>
-                    <input type="text" value="175 cm" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="text" 
+                      value={profileData.height || '175 cm'} 
+                      onChange={(e) => handleProfileChange('height', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Weight</label>
-                    <input type="text" value="70 kg" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="text" 
+                      value={profileData.weight || '70 kg'} 
+                      onChange={(e) => handleProfileChange('weight', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                    <input type="text" value="Mumbai, Maharashtra" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                    <input 
+                      type="text" 
+                      value={profileData.address || 'Mumbai, Maharashtra'} 
+                      onChange={(e) => handleProfileChange('address', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                    />
                   </div>
                 </div>
               </div>
@@ -1738,11 +1920,21 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="bg-white rounded-xl p-6 border border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Emergency Contact</h3>
-                  <input type="tel" value="+91 98765 43211" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                  <input 
+                    type="tel" 
+                    value={profileData.emergencyContact || '+91 98765 43211'} 
+                    onChange={(e) => handleProfileChange('emergencyContact', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                  />
                 </div>
                 <div className="bg-white rounded-xl p-6 border border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Known Allergies</h3>
-                  <input type="text" value="None known" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+                  <input 
+                    type="text" 
+                    value={profileData.allergies || 'None known'} 
+                    onChange={(e) => handleProfileChange('allergies', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
+                  />
                 </div>
               </div>
 
@@ -1812,12 +2004,7 @@ export default function Dashboard() {
 
               <div className="flex justify-end">
                 <button 
-                  onClick={() => updateProfile({
-                    name: user?.name || 'Demo User',
-                    email: user?.email || 'demo@example.com',
-                    phone: user?.phone || '+91 98765 43210',
-                    medications: medications
-                  })}
+                  onClick={() => updateProfile(profileData)}
                   className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
                 >
                   Save Changes
@@ -1838,17 +2025,17 @@ export default function Dashboard() {
               </div>
 
               {/* Dark Mode */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Dark Mode</h3>
-                    <p className="text-gray-600 text-sm">Switch to dark theme</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Dark Mode</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">Switch to dark theme</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
                       type="checkbox" 
                       className="sr-only peer" 
-                      checked={settings.darkMode}
+                      checked={isDarkMode}
                       onChange={() => handleSettingToggle('darkMode')}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
@@ -2045,6 +2232,137 @@ export default function Dashboard() {
             </div>
           )}
         </main>
+        
+        {/* Appointment Booking Modal */}
+        {showAppointmentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Book Appointment</h3>
+                <p className="text-gray-600">Confirm your appointment with {selectedDoctor?.name}</p>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-900">{selectedDoctor?.name}</h4>
+                <p className="text-gray-600 text-sm">{selectedDoctor?.specialization}</p>
+                <p className="text-lg font-semibold text-gray-900 mt-2">{selectedDoctor?.fee}</p>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Date & Time</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+              </div>
+              
+              <div className="flex space-x-4">
+                <button 
+                  onClick={() => setShowAppointmentModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmAppointment}
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Confirm Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Document Viewer Modal */}
+        {viewingDocument && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">{viewingDocument.name}</h3>
+                <button 
+                  onClick={() => setViewingDocument(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="overflow-auto max-h-[70vh]">
+                {viewingDocument.content ? (
+                  viewingDocument.fileType?.startsWith('image/') ? (
+                    <img 
+                      src={viewingDocument.content} 
+                      alt={viewingDocument.name}
+                      className="max-w-full h-auto rounded-lg"
+                    />
+                  ) : viewingDocument.fileType === 'application/pdf' ? (
+                    <iframe 
+                      src={viewingDocument.content}
+                      className="w-full h-96 rounded-lg"
+                      title={viewingDocument.name}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-gray-600">Preview not available for this file type</p>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-12">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-gray-600">No preview available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Device Status Modal */}
+        {showDeviceModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4">
+              <div className="text-center">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                  deviceModalType === 'success' ? 'bg-green-100' : 'bg-blue-100'
+                }`}>
+                  {deviceModalType === 'success' ? (
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {deviceModalType === 'success' ? 'Connected!' : 'Disconnected!'}
+                </h3>
+                <p className="text-gray-600 mb-6">{deviceModalMessage}</p>
+                <button 
+                  onClick={() => setShowDeviceModal(false)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )

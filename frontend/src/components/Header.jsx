@@ -9,6 +9,10 @@ export default function Header() {
   const handleNavClick = (section) => {
     if (section === 'get-started') {
       router.push('/login')
+    } else if (section === 'education') {
+      router.push('/education')
+    } else if (section === 'doctors') {
+      router.push('/dashboard')
     } else {
       console.log(`Navigating to: ${section}`)
     }
