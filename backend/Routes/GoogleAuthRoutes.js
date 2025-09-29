@@ -26,16 +26,36 @@ router.get('/patient/callback',
     (req, res, next) => {
         console.log('Patient callback route hit:', req.url);
         console.log('Query params:', req.query);
-        // If Google didn't return a code (often shows as scope error), restart the flow
-        if (!req.query.code && !req.query.state) {
+        if (req.query.error) {
+            const msg = encodeURIComponent(`${req.query.error}: ${req.query.error_description || ''}`);
+            return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+        }
+        if (!req.query.code) {
             return res.redirect('/api/auth/google/patient');
         }
         next();
     },
-    passport.authenticate('google-patient', {
-        failureRedirect: 'http://localhost:3000/login?error=google_patient_auth_failed&timestamp=' + Date.now()
-    }),
-    googleCallbackHandler
+    (req, res, next) => {
+        passport.authenticate('google-patient', (err, user, info) => {
+            if (err) {
+                console.error('Google patient authenticate error:', err);
+                const msg = encodeURIComponent(err.message || 'Unauthorized');
+                return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+            }
+            if (!user) {
+                const msg = encodeURIComponent(info?.message || 'Authentication failed');
+                return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+            }
+            req.logIn(user, (loginErr) => {
+                if (loginErr) {
+                    console.error('Login session error (patient):', loginErr);
+                    const msg = encodeURIComponent(loginErr.message || 'Login failed');
+                    return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+                }
+                return googleCallbackHandler(req, res);
+            });
+        })(req, res, next);
+    }
 );
 
 // Doctor Google OAuth initiation
@@ -52,15 +72,36 @@ router.get('/doctor/callback',
     (req, res, next) => {
         console.log('Doctor callback route hit:', req.url);
         console.log('Query params:', req.query);
-        if (!req.query.code && !req.query.state) {
+        if (req.query.error) {
+            const msg = encodeURIComponent(`${req.query.error}: ${req.query.error_description || ''}`);
+            return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+        }
+        if (!req.query.code) {
             return res.redirect('/api/auth/google/doctor');
         }
         next();
     },
-    passport.authenticate('google-doctor', {
-        failureRedirect: 'http://localhost:3000/login?error=google_doctor_auth_failed&timestamp=' + Date.now()
-    }),
-    googleCallbackHandler
+    (req, res, next) => {
+        passport.authenticate('google-doctor', (err, user, info) => {
+            if (err) {
+                console.error('Google doctor authenticate error:', err);
+                const msg = encodeURIComponent(err.message || 'Unauthorized');
+                return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+            }
+            if (!user) {
+                const msg = encodeURIComponent(info?.message || 'Authentication failed');
+                return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+            }
+            req.logIn(user, (loginErr) => {
+                if (loginErr) {
+                    console.error('Login session error (doctor):', loginErr);
+                    const msg = encodeURIComponent(loginErr.message || 'Login failed');
+                    return res.redirect(`http://localhost:3000/login?error=oauth_error&message=${msg}`);
+                }
+                return googleCallbackHandler(req, res);
+            });
+        })(req, res, next);
+    }
 );
 
 // Logout route

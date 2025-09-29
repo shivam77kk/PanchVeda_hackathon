@@ -12,7 +12,11 @@ export const initializeGoogleStrategy = () => {
 
     const PORT = process.env.PORT || 5000;
     // Use clear, explicit env vars. Fallbacks match GCP console entries provided by the user
-    const patientCallbackURL = process.env.GOOGLE_PATIENT_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI || `http://localhost:${PORT}/api/auth/google/patient/callback`;
+    // Accept common typo GOOGLE_REDIRECT_URI_ as well to prevent setup friction
+    const patientCallbackURL = process.env.GOOGLE_PATIENT_REDIRECT_URI 
+        || process.env.GOOGLE_REDIRECT_URI 
+        || process.env.GOOGLE_REDIRECT_URI_ 
+        || `http://localhost:${PORT}/api/auth/google/patient/callback`;
     const doctorCallbackURL = process.env.GOOGLE_DOCTOR_REDIRECT_URI || `http://localhost:${PORT}/api/auth/google/doctor/callback`;
     
     const maskedClientId = (process.env.GOOGLE_CLIENT_ID || '').replace(/.(?=.{6})/g, '*');
@@ -231,12 +235,7 @@ export const googleCallbackHandler = async (req, res) => {
         const userRole = req.user.role || 'patient';
         console.log('Processing authentication for role:', userRole);
 
-        // Generate JWT tokens
-        if (!process.env.ACCESS_TOKEN_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
-            console.error('JWT secrets not configured');
-            return res.redirect('http://localhost:3000/login?error=server_config_error');
-        }
-
+        // Generate JWT tokens (dev-friendly defaults are set in server startup)
         const accessToken = jwt.sign(
             { id: req.user._id, role: userRole, email: req.user.email },
             process.env.ACCESS_TOKEN_SECRET,

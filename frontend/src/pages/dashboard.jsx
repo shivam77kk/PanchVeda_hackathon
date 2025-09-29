@@ -85,7 +85,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token')
       if (!token) return
-      const response = await axios.get(`${API_BASE}/user/profile`, {
+      const response = await axios.get(`${API_BASE}/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setUser(response.data)
